@@ -21,7 +21,6 @@ def make_dct_matrix(n):
     for i in range(1, n):
         for j in range(n):
             matrix[i][j] = (2*j + 1) * i*np.pi/(2*n)
-        print(i)
 
     matrix = np.sqrt(2/n) * np.cos(matrix)
     matrix[0] = 1/np.sqrt(n)

@@ -28,7 +28,7 @@ def make_dct_matrix(n):
     return matrix
 
 
-def gradient_descent(img, coeff=0.1, learning_rate=0.1, epochs=400):
+def gradient_descent(img, coeff=0.1, learning_rate=0.1, epochs=100):
 
     for epoch in range(epochs):
         img = img - learning_rate * gradient(img, coeff)
