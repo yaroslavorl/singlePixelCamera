@@ -3,6 +3,7 @@ import cv2
 
 
 def single_pixel_detector(img, pattern):
+
     """Simulation single pixel detector
 
     :param img: 1-D image vector
@@ -51,7 +52,7 @@ def gradient(img, param):
     return 2/num_patterns * P.T.dot(np.dot(P, img) - m) + param*np.sign(img)
 
 
-def gradient_descent(img, param=0.05, learning_rate=0.01, epochs=10000):
+def gradient_descent(img, param=0.05, learning_rate=0.01, epochs=500):
 
     for epoch in range(epochs):
         img = img - learning_rate * gradient(img, param)
