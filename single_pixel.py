@@ -2,30 +2,14 @@ import numpy as np
 import cv2
 
 
-def soft_tresh(img, param):
-    return np.sign(img) * np.maximum(np.abs(img) - param, 0.)
+def single_pixel_detector(img, pattern):
+    """Simulation single pixel detector
 
-
-def least_squares(img):
-    return np.sum(img ** 2)/2
-
-
-def mse(img, coeff, num_patterns):
-
-    error = 0
-    for i in range(num_patterns):
-        error += least_squares(idct_matrices[i].dot(img) - y[i]) + coeff*np.linalg.norm(img, 1)
-
-    return error/num_patterns
-
-
-def gradient(img, img_size, num_patterns, coeff):
-    grad = np.zeros(img_size)
-
-    for i in range(num_patterns):
-        grad += np.dot(idct_matrices[i].T, idct_matrices[i].dot(img) - y[i]) + coeff*np.sign(img)
-
-    return 2/num_patterns * grad
+    :param img: 1-D image vector
+    :param pattern: 1-D pattern vector
+    :return: scalar
+    """
+    return pattern.dot(img)
 
 
 def make_dct_matrix(n):
@@ -34,78 +18,68 @@ def make_dct_matrix(n):
     for i in range(1, n):
         for j in range(n):
             matrix[i][j] = (2*j + 1) * i*np.pi/(2*n)
-            
+
     matrix = np.sqrt(2/n) * np.cos(matrix)
     matrix[0] = 1/np.sqrt(n)
-
 
     return matrix
 
 
-def make_measurements_patterns(num_patterns, sample, part):
+def make_patterns(img_size, num_patterns):
 
-    y_patterns = np.zeros((num_patterns, part))
+    patterns = np.random.rand(num_patterns, img_size, img_size)
+    patterns = np.where(patterns > 0.1, 0, 1)
 
-    for i in range(num_patterns):
-        y_patterns[i] = img_orig.flatten()[sample[i]]
-
-    return y_patterns
+    return patterns.reshape(num_patterns, img_size ** 2)
 
 
-def make_measurements_matrix(num_patterns, size_img, sample, y_patterns, part):
+def make_sparse_mask(img_size, percent):
+    mask = np.random.rand(img_size, img_size)
 
-    img_patterns = np.zeros((num_patterns, size_img))
-    img_dct = np.zeros((num_patterns, size_img))
-    idct_matrices = np.zeros((num_patterns, part, size_img))
-
-    for i in range(num_patterns):
-        img_patterns[i][sample[i]] = y_patterns[i]
-
-        img_dct[i] = dct_matrix.dot(img_patterns[i])
-        idct_matrices[i] = idct_matrix[sample[i]]
-
-    return idct_matrices, img_patterns[0]
+    return np.where(mask > percent, 0, 1)
 
 
+def least_squares(img):
+    return np.sum(img ** 2)/2
 
 
-def gradient_descent(img, img_size, num_patterns, coeff=0.01, learning_rate=0.9, epochs=15):
+def loss(img, param):
+    return least_squares(P.dot(img) - m) + param*np.linalg.norm(img, 1)
 
-    t = 1
-    new_img = img.copy()
+
+def gradient(img, param):
+    return 2/num_patterns * P.T.dot(np.dot(P, img) - m) + param*np.sign(img)
+
+
+def gradient_descent(img, param=0.05, learning_rate=0.01, epochs=10000):
 
     for epoch in range(epochs):
+        img = img - learning_rate * gradient(img, param)
 
-        old_img = img.copy()
-        new_img = new_img - learning_rate * gradient(new_img, img_size, num_patterns, coeff)
-        img = soft_tresh(new_img, coeff/learning_rate)
-
-        t_0 = t
-        t = (1 + np.sqrt(1 + 4 * t ** 2)) / 2
-        new_img = img + ((t_0 - 1) / t) * (img - old_img)
-
-        print('Эпоха: ', epoch, 'Ошибка: ', mse(img, coeff, num_patterns))
+        print('Эпоха: ', epoch, 'Ошибка: ', loss(img, param))
 
     return img
 
 
-num_patterns = 50
-img_orig = cv2.imread('home.jpeg', 0)
+num_patterns = 100
+percent_pixel = 0.1
+img_orig = cv2.imread('test.jpeg', 0)
 img_orig = img_orig.astype(np.float64) / 255
 
 size_2d_img = img_orig.shape
 size_img = img_orig.flatten().shape[0]
 
 dct_matrix = make_dct_matrix(size_img)
+
+patterns = make_patterns(size_2d_img[0], num_patterns)
+m = single_pixel_detector(img_orig.flatten(), patterns)
+img = make_sparse_mask(size_2d_img[0], percent_pixel) * img_orig
+
+cv2.imwrite('0.jpeg', img * 255)
+
+img = dct_matrix.dot(img.flatten())
 idct_matrix = dct_matrix.T
+P = patterns.dot(idct_matrix)
 
-percent = 0.1
-part = int(size_img * percent)
-sample = np.random.choice(size_img, (num_patterns, part))
-
-y = make_measurements_patterns(num_patterns, sample, part)
-idct_matrices, img = make_measurements_matrix(num_patterns, size_img, sample, y, part)
-
-img = gradient_descent(img, size_img, num_patterns)
-
-cv2.imwrite('test.jpeg', dct_matrix.T.dot(img * 255).reshape(size_2d_img))
+img = gradient_descent(img)
+cv2.imwrite('1.jpeg', dct_matrix.T.dot(img * 255).reshape(size_2d_img))
